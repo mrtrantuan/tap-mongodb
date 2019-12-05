@@ -12,7 +12,7 @@ from terminaltables import AsciiTable
 import pytz
 import tzlocal
 
-INCLUDE_SCHEMAS_IN_DESTINATION_STREAM_NAME = False
+INCLUDE_SCHEMAS_IN_DESTINATION_STREAM_NAME = True
 UPDATE_BOOKMARK_PERIOD = 1000
 COUNTS = {}
 TIMES = {}

@@ -67,9 +67,11 @@ def get_roles(client, config):
     #         }
     #     ]
     # }
-    user_info = client[config['database']].command({'usersInfo': config['user']})
+    user_info = client[config['database']].command(
+        {'usersInfo': config['user']})
 
-    users = [u for u in user_info.get('users') if u.get('user') == config['user']]
+    users = [u for u in user_info.get(
+        'users') if u.get('user') == config['user']]
     if len(users) != 1:
         LOGGER.warning('Could not find any users for %s', config['user'])
         return []
@@ -93,7 +95,8 @@ def get_roles(client, config):
         else:
             role_info_list = client[config['database']].command(
                 {'rolesInfo': {'role': role_name, 'db': config['database']}})
-            role_info = [r for r in role_info_list.get('roles', []) if r['role'] == role_name]
+            role_info = [r for r in role_info_list.get(
+                'roles', []) if r['role'] == role_name]
             if len(role_info) != 1:
                 continue
             for sub_role in role_info[0].get('roles', []):
@@ -102,14 +105,17 @@ def get_roles(client, config):
                         roles.append(sub_role)
     return roles
 
+
 def get_databases(client, config):
     roles = get_roles(client, config)
     LOGGER.info('Roles: %s', roles)
 
-    can_read_all = len([r for r in roles if r['role'] in ROLES_WITH_ALL_DB_FIND_PRIVILEGES]) > 0
+    can_read_all = len([r for r in roles if r['role']
+                        in ROLES_WITH_ALL_DB_FIND_PRIVILEGES]) > 0
 
     if can_read_all:
-        db_names = [d for d in client.list_database_names() if d not in IGNORE_DBS]
+        db_names = [d for d in client.list_database_names()
+                    if d not in IGNORE_DBS]
     else:
         db_names = [r['db'] for r in roles if r['db'] not in IGNORE_DBS]
     LOGGER.info('Datbases: %s', db_names)
@@ -125,7 +131,8 @@ def produce_collection_schema(collection):
     mdata = {}
     mdata = metadata.write(mdata, (), 'table-key-properties', ['_id'])
     mdata = metadata.write(mdata, (), 'database-name', collection_db_name)
-    mdata = metadata.write(mdata, (), 'row-count', collection.estimated_document_count())
+    mdata = metadata.write(mdata, (), 'row-count',
+                           collection.estimated_document_count())
     mdata = metadata.write(mdata, (), 'is-view', is_view)
 
     # write valid-replication-key metadata by finding fields that have indexes on them.
@@ -143,7 +150,8 @@ def produce_collection_schema(collection):
                     valid_replication_keys.append(index_field_info[0])
 
         if valid_replication_keys:
-            mdata = metadata.write(mdata, (), 'valid-replication-keys', valid_replication_keys)
+            mdata = metadata.write(
+                mdata, (), 'valid-replication-keys', valid_replication_keys)
 
     return {
         'table_name': collection_name,
@@ -177,7 +185,7 @@ def do_discover(client, config):
                         db_name, collection_name)
             streams.append(produce_collection_schema(collection))
 
-    json.dump({'streams' : streams}, sys.stdout, indent=2)
+    json.dump({'streams': streams}, sys.stdout, indent=2)
 
 
 def is_stream_selected(stream):
@@ -228,6 +236,7 @@ def write_schema_message(stream):
         schema=stream['schema'],
         key_properties=['_id']))
 
+
 def load_stream_projection(stream):
     md_map = metadata.to_map(stream['metadata'])
     stream_projection = metadata.get(md_map, (), 'tap-mongodb.projection')
@@ -243,10 +252,11 @@ def load_stream_projection(stream):
 
     if stream_projection and stream_projection.get('_id') == 0:
         raise common.InvalidProjectionException(
-            "Projection blacklists key property id for collection {}" \
+            "Projection blacklists key property id for collection {}"
             .format(stream['tap_stream_id']))
 
     return stream_projection
+
 
 def clear_state_on_replication_change(stream, state):
     md_map = metadata.to_map(stream['metadata'])
@@ -254,25 +264,32 @@ def clear_state_on_replication_change(stream, state):
 
     # replication method changed
     current_replication_method = metadata.get(md_map, (), 'replication-method')
-    last_replication_method = singer.get_bookmark(state, tap_stream_id, 'last_replication_method')
+    last_replication_method = singer.get_bookmark(
+        state, tap_stream_id, 'last_replication_method')
     if last_replication_method is not None and (current_replication_method != last_replication_method):
         log_msg = 'Replication method changed from %s to %s, will re-replicate entire collection %s'
-        LOGGER.info(log_msg, last_replication_method, current_replication_method, tap_stream_id)
+        LOGGER.info(log_msg, last_replication_method,
+                    current_replication_method, tap_stream_id)
         state = singer.reset_stream(state, tap_stream_id)
 
     # replication key changed
     if current_replication_method == 'INCREMENTAL':
-        last_replication_key = singer.get_bookmark(state, tap_stream_id, 'replication_key_name')
+        last_replication_key = singer.get_bookmark(
+            state, tap_stream_id, 'replication_key_name')
         current_replication_key = metadata.get(md_map, (), 'replication-key')
         if last_replication_key is not None and (current_replication_key != last_replication_key):
             log_msg = 'Replication Key changed from %s to %s, will re-replicate entire collection %s'
-            LOGGER.info(log_msg, last_replication_key, current_replication_key, tap_stream_id)
+            LOGGER.info(log_msg, last_replication_key,
+                        current_replication_key, tap_stream_id)
             state = singer.reset_stream(state, tap_stream_id)
-        state = singer.write_bookmark(state, tap_stream_id, 'replication_key_name', current_replication_key)
+        state = singer.write_bookmark(
+            state, tap_stream_id, 'replication_key_name', current_replication_key)
 
-    state = singer.write_bookmark(state, tap_stream_id, 'last_replication_method', current_replication_method)
+    state = singer.write_bookmark(
+        state, tap_stream_id, 'last_replication_method', current_replication_method)
 
     return state
+
 
 def sync_stream(client, stream, state):
     tap_stream_id = stream['tap_stream_id']
@@ -313,17 +330,21 @@ def sync_stream(client, stream, state):
                 # starting point after the full table sync
                 if singer.get_bookmark(state, tap_stream_id, 'version') is None:
                     collection_oplog_ts = oplog.get_latest_ts(client)
-                    oplog.update_bookmarks(state, tap_stream_id, collection_oplog_ts)
+                    oplog.update_bookmarks(
+                        state, tap_stream_id, collection_oplog_ts)
 
-                full_table.sync_collection(client, stream, state, stream_projection)
+                full_table.sync_collection(
+                    client, stream, state, stream_projection)
 
             oplog.sync_collection(client, stream, state, stream_projection)
 
         elif replication_method == 'FULL_TABLE':
-            full_table.sync_collection(client, stream, state, stream_projection)
+            full_table.sync_collection(
+                client, stream, state, stream_projection)
 
         elif replication_method == 'INCREMENTAL':
-            incremental.sync_collection(client, stream, state, stream_projection)
+            incremental.sync_collection(
+                client, stream, state, stream_projection)
         else:
             raise Exception(
                 "only FULL_TABLE, LOG_BASED, and INCREMENTAL replication \
@@ -348,10 +369,16 @@ def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     config = args.config
 
+    # client = pymongo.MongoClient(host=config['host'],
+    #                              port=int(config['port']),
+    #                              username=config.get('user', None),
+    #                              password=config.get('password', None),
+    #                              authSource=config['database'],
+    #                              ssl=(config.get('ssl') == 'true'),
+    #                              replicaset=config.get('replica_set', None),
+    #                              readPreference='secondaryPreferred')
+
     client = pymongo.MongoClient(host=config['host'],
-                                 port=int(config['port']),
-                                 username=config.get('user', None),
-                                 password=config.get('password', None),
                                  authSource=config['database'],
                                  ssl=(config.get('ssl') == 'true'),
                                  replicaset=config.get('replica_set', None),
@@ -369,6 +396,7 @@ def main_impl():
     elif args.catalog:
         state = args.state or {}
         do_sync(client, args.catalog.to_dict(), state)
+
 
 def main():
     try:
